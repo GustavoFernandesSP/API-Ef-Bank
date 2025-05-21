@@ -43,7 +43,6 @@ async function obterToken() {
 
   const response = await axios({
     method: 'post',
-    // url: 'https://pix-h.api.efipay.com.br/oauth/token',
     url: 'https://pix.api.efipay.com.br/oauth/token',
     headers: {
       Authorization: 'Basic ' + auth,
@@ -123,6 +122,9 @@ app.post('/pix', async (req, res) => {
 });
 
 
+
+
+
 app.post('/GerarImagePix', async (req, res) => {
     const { pixCopiaECola } = req.body;
   
@@ -140,6 +142,58 @@ app.post('/GerarImagePix', async (req, res) => {
   });
 
 
+
+  app.post('/ConsultarCobrancas', async (req, res) => {
+    const { usuarioId } = req.body;
+    
+    if (!usuarioId) {
+      return res.status(400).json({ erro: 'usuarioId é obrigatório' });
+    }
+  
+    try {
+      const query = `
+        SELECT txid
+        FROM cobrancas
+        WHERE usuario_id = $1
+        ORDER BY criado_em DESC
+        LIMIT 1
+      `;
+  
+      const resultado = await pool.query(query, [usuarioId]);
+  
+      if (resultado.rows.length === 0) {
+        return res.status(404).json({ mensagem: 'Nenhuma cobrança encontrada para este usuário.' });
+      }
+
+      const txid = resultado.rows[0].txid;
+      
+      const accessToken = await obterToken();
+      const ConsultaPixResponse = await axios({
+        method: 'GET',
+        url: `https://pix.api.efipay.com.br/v2/cob/${txid}`,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        httpsAgent
+      });
+  
+      const  Status  = ConsultaPixResponse.data.status;
+  
+      console.log(Status);
+  
+      res.json({
+        txid: txid,
+        status: Status
+      });
+
+
+    } catch (erro) {
+      console.error('Erro ao consultar cobranças:', erro);
+      res.status(500).json({ erro: 'Erro interno do servidor' });
+    }
+  });
+  
 
 
 
