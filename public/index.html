@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Teste Pix - Efí</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    label { display: block; margin-top: 1rem; }
+    input { width: 100%; padding: 8px; margin-top: 5px; }
+    button { margin-top: 1rem; padding: 10px 20px; cursor: pointer; }
+    #resultado { margin-top: 2rem; }
+    img { max-width: 250px; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Gerar Cobrança Pix</h1>
+
+  <label for="nome">Nome:</label>
+  <input id="nome" type="text" placeholder="Nome completo"/>
+
+  <label for="cpf">CPF:</label>
+  <input id="cpf" type="text" placeholder="Apenas números"/>
+
+  <label for="valor">Valor (ex: 12.50):</label>
+  <input id="valor" type="text" placeholder="R$"/>
+
+  <button onclick="gerarPix()">Gerar Pix</button>
+
+  <div id="resultado"></div>
+
+  <script>
+    async function gerarPix() {
+      const nome = document.getElementById('nome').value;
+      const cpf = document.getElementById('cpf').value;
+      const valorRaw = document.getElementById('valor').value;
+      const valor = parseFloat(valorRaw.replace(',', '.')).toFixed(2);
+      const usuarioId = "1";
+
+      const resultado = document.getElementById('resultado');
+      resultado.innerHTML = 'Gerando...';
+
+      try {
+        // Chama o backend para gerar cobrança
+        const resposta = await fetch('/pix', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nome, cpf, valor, usuarioId })
+        });
+
+        const dados = await resposta.json();
+
+        if (!resposta.ok) throw new Error(dados.erro || 'Erro ao gerar Pix');
+
+        // Chama backend para gerar QR Code da string
+        const qrResposta = await fetch('/GerarImagePix', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pixCopiaECola: dados.pixCopiaECola })
+        });
+
+        const qrDados = await qrResposta.json();
+
+        resultado.innerHTML = `
+          <strong>TxID:</strong> ${dados.txid}<br/>
+          <strong>Pix Copia e Cola:</strong><br/>
+          <textarea rows="4" style="width:100%">${dados.pixCopiaECola}</textarea><br/>
+          <img src="${qrDados.qrCodeImageBase64}" alt="QR Code Pix"/>
+        `;
+      } catch (err) {
+        resultado.innerHTML = `<p style="color:red;">${err.message}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>
